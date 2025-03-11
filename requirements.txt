@@ -1,3 +1,1 @@
-Flask==2.3.2
-pip install python-dotenv
-pip install pymongo
+pip install flask flask-cors pymongo bcrypt flask-jwt-extended python-dotenv dnspyth
