@@ -31,10 +31,14 @@ def signup():
     email = data.get("email")
     password = data.get("password")
 
+    print(f"Received signup request with username: {username}, email: {email}, password: {password}")  # เพิ่ม log
+
     if not username or not email or not password:
+        print("Missing required fields")  # เพิ่ม log
         return jsonify({"message": "Missing required fields"}), 400
 
     if users_collection.find_one({"email": email}):
+        print(f"Email already exists: {email}")  # เพิ่ม log
         return jsonify({"message": "Email already exists"}), 400
 
     hashed_password = generate_password_hash(password)
@@ -47,6 +51,7 @@ def signup():
 
     users_collection.insert_one(new_user)
 
+    print(f"User created successfully: {email}")  # เพิ่ม log
     return jsonify({"message": "User created successfully!"}), 201
 
 # Endpoint: Login (เข้าสู่ระบบ)
@@ -66,7 +71,6 @@ def login():
 
     # ตรวจสอบรหัสผ่าน
     if not check_password_hash(user["password"], password):
-        print(f"Invalid password for user: {email}")  # เพิ่ม log
         return jsonify({"message": "Invalid password"}), 401
 
     # สร้าง JWT token
