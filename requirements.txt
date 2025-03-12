@@ -1,1 +1,5 @@
-pip install flask flask-cors pymongo bcrypt flask-jwt-extended python-dotenv dnspyth
+pip install bcrypt python-dotenv dnspyth
+pip install flask flask-cors flask_jwt_extended
+pip install flask_jwt_extended
+pip install pymongo
+pip install dotenv
