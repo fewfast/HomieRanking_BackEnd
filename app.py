@@ -5,6 +5,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
 
 # โหลดค่าจาก .env
 load_dotenv()
@@ -22,6 +23,17 @@ DATABASE_NAME = os.getenv("DATABASE")
 client = MongoClient(MONGO_URI)
 db = client[DATABASE_NAME]
 users_collection = db["users"]  # สมมติว่าเรามี collection ชื่อ "users"
+data_collection = db["data"]  # เพิ่ม collection ชื่อ "data"
+
+# ตั้งค่าการอัปโหลดไฟล์
+UPLOAD_FOLDER = "uploads"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Endpoint: Signup (สร้างผู้ใช้ใหม่)
 @app.route("/signup", methods=["POST"])
@@ -85,6 +97,51 @@ def login():
 @app.route("/")
 def home():
     return jsonify({"message": "Flask + MongoDB API Running!"}), 200
+
+# Endpoint: Upload Quiz
+@app.route("/upload_quiz", methods=["POST"])
+def upload_quiz():
+    data = request.form
+    title = data.get("title")
+    description = data.get("description")
+    categories = request.form.getlist("categories")  # รับค่าหลายค่า
+
+    if not title or not description:
+        return jsonify({"error": "Title and description are required"}), 400
+
+    # จัดการอัปโหลด Thumbnail
+    thumbnail_url = None
+    if "thumbnail" in request.files:
+        file = request.files["thumbnail"]
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            file.save(file_path)
+            thumbnail_url = file_path
+
+    # จัดการอัปโหลดรูปภาพหลายรูป
+    image_urls = []
+    if "images" in request.files:
+        files = request.files.getlist("images")
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                file.save(file_path)
+                image_urls.append(file_path)
+
+    # บันทึกข้อมูลลง MongoDB
+    quiz_data = {
+        "title": title,
+        "description": description,
+        "categories": categories,
+        "thumbnail": thumbnail_url,
+        "images": image_urls,
+    }
+
+    quiz_id = data_collection.insert_one(quiz_data).inserted_id
+
+    return jsonify({"message": "Quiz uploaded successfully", "quiz_id": str(quiz_id)}), 201
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3001, debug=True)
