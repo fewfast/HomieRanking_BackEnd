@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -58,7 +58,7 @@ def signup():
     new_user = {
         "username": username,
         "email": email,
-        "password": hashed_password,
+        "password": hashed_password
     }
 
     users_collection.insert_one(new_user)
@@ -99,49 +99,41 @@ def home():
     return jsonify({"message": "Flask + MongoDB API Running!"}), 200
 
 # Endpoint: Upload Quiz
-@app.route("/upload_quiz", methods=["POST"])
+@app.route("/upload_quiz", methods=['POST'])
 def upload_quiz():
-    data = request.form
-    title = data.get("title")
-    description = data.get("description")
-    categories = request.form.getlist("categories")  # รับค่าหลายค่า
+    data = request.get_json()
 
-    if not title or not description:
-        return jsonify({"error": "Title and description are required"}), 400
+    # Ensure images is a list
+    images = data.get("images")
+    if not isinstance(images, list):
+        images = [images]
 
-    # จัดการอัปโหลด Thumbnail
-    thumbnail_url = None
-    if "thumbnail" in request.files:
-        file = request.files["thumbnail"]
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-            file.save(file_path)
-            thumbnail_url = file_path
-
-    # จัดการอัปโหลดรูปภาพหลายรูป
-    image_urls = []
-    if "images" in request.files:
-        files = request.files.getlist("images")
-        for file in files:
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                file.save(file_path)
-                image_urls.append(file_path)
-
-    # บันทึกข้อมูลลง MongoDB
-    quiz_data = {
-        "title": title,
-        "description": description,
-        "categories": categories,
-        "thumbnail": thumbnail_url,
-        "images": image_urls,
+    new_quiz = {
+        "title": data.get("title"),
+        "description": data.get("description"),
+        "categories": data.get("categories"),
+        "thumbnail": data.get("thumbnail"),
+        "images": images
     }
 
-    quiz_id = data_collection.insert_one(quiz_data).inserted_id
+    quiz_id = data_collection.insert_one(new_quiz).inserted_id
 
-    return jsonify({"message": "Quiz uploaded successfully", "quiz_id": str(quiz_id)}), 201
+    new_quiz["_id"] = str(quiz_id)  # Convert ObjectId to string
 
+    return jsonify(new_quiz), 201
+
+@app.route("/get_quizzes", methods=["GET"])
+def get_quizzes():
+    try:
+        quizzes = data_collection.find({}, {"_id": 1, "title": 1, "description": 1, "categories": 1, "thumbnail": 1, "images": 1})
+        quizzes_list = []
+        for quiz in quizzes:
+            quiz["_id"] = str(quiz["_id"])  # Convert ObjectId to string
+            quizzes_list.append(quiz)
+        return jsonify(quizzes_list), 200
+    except Exception as error:
+        print(f"Error getting quizzes: {error}")
+        return jsonify({"error": "Internal Server Error"}), 500
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3001, debug=True)
