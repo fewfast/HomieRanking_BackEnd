@@ -199,13 +199,38 @@ def update_quiz(_id):
 
         updated_quiz["_id"] = str(quiz["_id"])  # Convert ObjectId to string
 
-        print(f"Quiz updated by {current_user}: {updated_quiz}")  # Add logging
-
         return jsonify(updated_quiz), 200
 
     except Exception as error:
         print(f"Error updating quiz: {error}")
         return jsonify({"error": "Internal Server Error"}), 500
     
+@app.route("/delete_quiz/<string:_id>", methods=["DELETE"])
+@jwt_required()
+def delete_quiz(_id):
+    try:
+        current_user = get_jwt_identity()
+
+        # Find the quiz by _id
+        quiz = data_collection.find_one({"_id": ObjectId(_id)})
+        if not quiz:
+            return jsonify({"message": "Quiz not found"}), 404
+
+        # Check if the current user is the owner of the quiz
+        if quiz["uploaded_by"] != current_user:
+            return jsonify({"message": "You are not authorized to delete this quiz"}), 403
+
+        # Delete the quiz from the database
+        result = data_collection.delete_one({"_id": ObjectId(_id)})
+
+        if result.deleted_count == 0:
+            return jsonify({"message": "Failed to delete the quiz"}), 500
+
+        return jsonify({"message": "Quiz deleted successfully"}), 200
+
+    except Exception as error:
+        print(f"Error deleting quiz: {error}")
+        return jsonify({"error": "Internal Server Error"}), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3001, debug=True)
