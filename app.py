@@ -40,44 +40,42 @@ def allowed_file(filename):
 def signup():
     data = request.get_json()
     username = data.get("username")
-    email = data.get("email")
     password = data.get("password")
 
-    print(f"Received signup request with username: {username}, email: {email}, password: {password}")  # เพิ่ม log
+    print(f"Received signup request with username: {username}, password: {password}")  # เพิ่ม log
 
-    if not username or not email or not password:
+    if not username or not password:
         print("Missing required fields")  # เพิ่ม log
         return jsonify({"message": "Missing required fields"}), 400
 
-    if users_collection.find_one({"email": email}):
-        print(f"Email already exists: {email}")  # เพิ่ม log
-        return jsonify({"message": "Email already exists"}), 400
+    if users_collection.find_one({"username": username}):
+        print(f"Username already exists: {username}")  # เพิ่ม log
+        return jsonify({"message": "Username already exists"}), 400
 
     hashed_password = generate_password_hash(password)
 
     new_user = {
         "username": username,
-        "email": email,
         "password": hashed_password
     }
 
     users_collection.insert_one(new_user)
 
-    print(f"User created successfully: {email}")  # เพิ่ม log
-    return jsonify({"message": "User created successfully!"}), 201
+    print(f"User created successfully: {username}")  # เพิ่ม log
+    return jsonify({"message": "Successfully!"}), 201
 
 # Endpoint: Login (เข้าสู่ระบบ)
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
-    email = data.get("email")
+    username = data.get("username")
     password = data.get("password")
 
-    if not email or not password:
+    if not username or not password:
         return jsonify({"message": "Missing required fields"}), 400
 
-    # ค้นหาผู้ใช้ตาม email
-    user = users_collection.find_one({"email": email})
+    # ค้นหาผู้ใช้ตาม username
+    user = users_collection.find_one({"username": username})
     if not user:
         return jsonify({"message": "User not found"}), 404
 
@@ -86,7 +84,7 @@ def login():
         return jsonify({"message": "Invalid password"}), 401
 
     # สร้าง JWT token
-    access_token = create_access_token(identity={"email": user["email"], "username": user["username"]})
+    access_token = create_access_token(identity={"username": user["username"]})
 
     return jsonify({
         "message": "Login successful",
