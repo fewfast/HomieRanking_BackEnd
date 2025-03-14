@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from datetime import timedelta
-
+from bson import ObjectId
 
 # โหลดค่าจาก .env
 load_dotenv()
@@ -160,5 +160,52 @@ def get_quizzes():
         print(f"Error getting quizzes: {error}")
         return jsonify({"error": "Internal Server Error"}), 500
 
+# Endpoint: Update Quiz by ID
+@app.route("/update_quiz/<string:_id>", methods=["PUT"])
+@jwt_required()
+def update_quiz(_id):
+    try:
+        data = request.get_json()
+        current_user = get_jwt_identity()
+
+        # Validate input data
+        if not data:
+            return jsonify({"message": "No data provided"}), 400
+
+        # Find the quiz by _id
+        quiz = data_collection.find_one({"_id": ObjectId(_id)})
+        if not quiz:
+            return jsonify({"message": "Quiz not found"}), 404
+
+       # Combine images and image_names into a list of dictionaries
+        images = data.get("images", [])
+        image_names = data.get("image_names", [])
+        images_with_names = [{"image": img, "name": name} for img, name in zip(images, image_names)]
+
+        # Update the quiz fields
+        updated_quiz = {
+        "title": data.get("title", quiz["title"]),
+        "description": data.get("description", quiz["description"]),
+        "categories": data.get("categories", quiz["categories"]),
+        "thumbnail": data.get("thumbnail", quiz["thumbnail"]),
+        "images": images_with_names,
+        }   
+
+        # Update the quiz in the database
+        result = data_collection.update_one({"_id": ObjectId(_id)}, {"$set": updated_quiz})
+
+        if result.modified_count == 0:
+            return jsonify({"message": "No changes made to the quiz"}), 200
+
+        updated_quiz["_id"] = str(quiz["_id"])  # Convert ObjectId to string
+
+        print(f"Quiz updated by {current_user}: {updated_quiz}")  # Add logging
+
+        return jsonify(updated_quiz), 200
+
+    except Exception as error:
+        print(f"Error updating quiz: {error}")
+        return jsonify({"error": "Internal Server Error"}), 500
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3001, debug=True)
