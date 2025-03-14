@@ -73,23 +73,22 @@ def signup():
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
-    email = data.get("email")
+    username = data.get("username")
     password = data.get("password")
 
-    if not email or not password:
+    if not username or not password:
         return jsonify({"message": "Missing required fields"}), 400
 
-    # ค้นหาผู้ใช้ตาม email
-    user = users_collection.find_one({"email": email})
+    user = users_collection.find_one({"username": username})
     if not user:
-        return jsonify({"message": "User not found"}), 404
+        return jsonify({"message": "User not found"}),
 
     # ตรวจสอบรหัสผ่าน
     if not check_password_hash(user["password"], password):
         return jsonify({"message": "Invalid password"}), 401
 
     # สร้าง JWT token
-    access_token = create_access_token(identity=email)
+    access_token = create_access_token(identity=username)
 
     return jsonify({
         "message": "Login successful",
@@ -101,38 +100,50 @@ def login():
 def home():
     return jsonify({"message": "Flask + MongoDB API Running!"}), 200
 
-# Endpoint: Upload Quiz
-@app.route("/upload_quiz", methods=['POST'])
+# Endpoint: Upload
+@app.route("/upload", methods=['POST'])
 @jwt_required()
-def upload_quiz():
+def upload():
     try:
         data = request.get_json()
         current_user = get_jwt_identity()
+
+        # Log the current_user to verify its structure
+        print(f"Current user: {current_user}")
 
         # Ensure images is a list
         images = data.get("images")
         if not isinstance(images, list):
             images = [images]
 
+        # Ensure image_names is a list
+        image_names = data.get("image_names")
+        if not isinstance(image_names, list):
+            image_names = [image_names]
+
+        # Combine images and image_names into a list of dictionaries
+        images_with_names = [{"image": img, "name": name} for img, name in zip(images, image_names)]
+
         new_quiz = {
             "title": data.get("title"),
             "description": data.get("description"),
             "categories": data.get("categories"),
             "thumbnail": data.get("thumbnail"),
-            "images": images,
-            "uploaded_by": current_user  # Add the user's email who uploaded the quiz
+            "images": images_with_names,
+            "uploaded_by": current_user # Change to username
         }
 
         quiz_id = data_collection.insert_one(new_quiz).inserted_id
 
         new_quiz["_id"] = str(quiz_id)  # Convert ObjectId to string
 
-        print(f"New quiz uploaded by {current_user['email']}: {new_quiz}")  # Add logging
+        print(f"New quiz uploaded by {current_user['username']}: {new_quiz}")  # Add logging
 
         return jsonify(new_quiz), 201
 
     except Exception as e:
-        return jsonify(""), 500
+        print(f"Error: {e}")  # Log error
+        return jsonify({"error": "Internal Server Error"}), 500
 
 # Endpoint: Get Quizzes
 @app.route("/get_quizzes", methods=["GET"])
