@@ -1,11 +1,13 @@
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import check_password_hash, generate_password_hash
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
+from datetime import timedelta
+
 
 # โหลดค่าจาก .env
 load_dotenv()
@@ -14,6 +16,7 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET")  # ใช้คีย์ลับที่ตั้งใน .env
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=365*10)
 jwt = JWTManager(app)
 
 # MongoDB connection
@@ -86,7 +89,7 @@ def login():
         return jsonify({"message": "Invalid password"}), 401
 
     # สร้าง JWT token
-    access_token = create_access_token(identity={"email": user["email"], "username": user["username"]})
+    access_token = create_access_token(identity=email)
 
     return jsonify({
         "message": "Login successful",
@@ -100,32 +103,43 @@ def home():
 
 # Endpoint: Upload Quiz
 @app.route("/upload_quiz", methods=['POST'])
+@jwt_required()
 def upload_quiz():
-    data = request.get_json()
+    try:
+        data = request.get_json()
+        current_user = get_jwt_identity()
 
-    # Ensure images is a list
-    images = data.get("images")
-    if not isinstance(images, list):
-        images = [images]
+        # Ensure images is a list
+        images = data.get("images")
+        if not isinstance(images, list):
+            images = [images]
 
-    new_quiz = {
-        "title": data.get("title"),
-        "description": data.get("description"),
-        "categories": data.get("categories"),
-        "thumbnail": data.get("thumbnail"),
-        "images": images
-    }
+        new_quiz = {
+            "title": data.get("title"),
+            "description": data.get("description"),
+            "categories": data.get("categories"),
+            "thumbnail": data.get("thumbnail"),
+            "images": images,
+            "uploaded_by": current_user  # Add the user's email who uploaded the quiz
+        }
 
-    quiz_id = data_collection.insert_one(new_quiz).inserted_id
+        quiz_id = data_collection.insert_one(new_quiz).inserted_id
 
-    new_quiz["_id"] = str(quiz_id)  # Convert ObjectId to string
+        new_quiz["_id"] = str(quiz_id)  # Convert ObjectId to string
 
-    return jsonify(new_quiz), 201
+        print(f"New quiz uploaded by {current_user['email']}: {new_quiz}")  # Add logging
 
+        return jsonify(new_quiz), 201
+
+    except Exception as e:
+        return jsonify(""), 500
+
+# Endpoint: Get Quizzes
 @app.route("/get_quizzes", methods=["GET"])
+@jwt_required()
 def get_quizzes():
     try:
-        quizzes = data_collection.find({}, {"_id": 1, "title": 1, "description": 1, "categories": 1, "thumbnail": 1, "images": 1})
+        quizzes = data_collection.find({}, {"_id": 1, "title": 1, "description": 1, "categories": 1, "thumbnail": 1, "images": 1, "uploaded_by": 1})
         quizzes_list = []
         for quiz in quizzes:
             quiz["_id"] = str(quiz["_id"])  # Convert ObjectId to string
@@ -134,6 +148,6 @@ def get_quizzes():
     except Exception as error:
         print(f"Error getting quizzes: {error}")
         return jsonify({"error": "Internal Server Error"}), 500
-    
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3001, debug=True)
