@@ -1,3 +1,0 @@
-MONGO_URI=mongodb+srv://HomieRanking:1E69la6EVOar9dDk@mydb.uxw7p.mongodb.net/?retryWrites=true&w=majority&appName=mydb
-DATABASE=HomieRanking
-JWT_SECRET=supersecretkey  # ใช้เข้ารหัส JWT Token

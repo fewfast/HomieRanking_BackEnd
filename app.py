@@ -146,7 +146,6 @@ def upload():
 
 # Endpoint: Get Quizzes
 @app.route("/get_quizzes", methods=["GET"])
-@jwt_required()
 def get_quizzes():
     try:
         quizzes = data_collection.find({}, {"_id": 1, "title": 1, "description": 1, "categories": 1, "thumbnail": 1, "images": 1, "uploaded_by": 1})
