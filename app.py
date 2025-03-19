@@ -91,7 +91,11 @@ def login():
 
     return jsonify({
         "message": "Login successful",
-        "access_token": access_token
+        "access_token": access_token,
+        "user": {
+            "_id": str(user["_id"]),
+            "username": user["username"]
+        }
     }), 200
 
 # หน้าแรก
